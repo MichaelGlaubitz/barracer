@@ -1,154 +1,202 @@
-const canvas = document.querySelector("#game");
+const canvas = document.querySelector("#chart");
 const context = canvas.getContext("2d");
-const scoreElement = document.querySelector("#score");
-const bestElement = document.querySelector("#best");
+const yearElement = document.querySelector("#year");
+const leaderElement = document.querySelector("#leader");
+const playToggle = document.querySelector("#playToggle");
+const resetButton = document.querySelector("#resetButton");
 
-const keys = new Set();
-const player = {
-  x: 120,
-  y: canvas.height / 2,
-  width: 26,
-  height: 72,
-  speed: 440,
+const frames = [
+  {
+    year: 2019,
+    values: {
+      Toyota: 10.2,
+      Volkswagen: 9.4,
+      Ford: 6.1,
+      Honda: 5.8,
+      Nissan: 5.1,
+      Hyundai: 4.7,
+      BMW: 3.0,
+      Mercedes: 2.8,
+    },
+  },
+  {
+    year: 2020,
+    values: {
+      Toyota: 10.8,
+      Volkswagen: 8.9,
+      Ford: 5.6,
+      Honda: 5.4,
+      Nissan: 4.8,
+      Hyundai: 5.0,
+      BMW: 3.2,
+      Mercedes: 2.9,
+    },
+  },
+  {
+    year: 2021,
+    values: {
+      Toyota: 11.4,
+      Volkswagen: 8.6,
+      Ford: 5.2,
+      Honda: 5.0,
+      Nissan: 4.6,
+      Hyundai: 5.4,
+      BMW: 3.4,
+      Mercedes: 3.1,
+    },
+  },
+  {
+    year: 2022,
+    values: {
+      Toyota: 11.7,
+      Volkswagen: 8.1,
+      Ford: 5.0,
+      Honda: 4.8,
+      Nissan: 4.3,
+      Hyundai: 5.8,
+      BMW: 3.5,
+      Mercedes: 3.2,
+    },
+  },
+  {
+    year: 2023,
+    values: {
+      Toyota: 12.0,
+      Volkswagen: 7.9,
+      Ford: 4.8,
+      Honda: 4.7,
+      Nissan: 4.1,
+      Hyundai: 6.0,
+      BMW: 3.7,
+      Mercedes: 3.4,
+    },
+  },
+  {
+    year: 2024,
+    values: {
+      Toyota: 12.3,
+      Volkswagen: 7.7,
+      Ford: 4.6,
+      Honda: 4.8,
+      Nissan: 4.0,
+      Hyundai: 6.3,
+      BMW: 3.9,
+      Mercedes: 3.5,
+    },
+  },
+];
+
+const colors = {
+  Toyota: "#e84c3d",
+  Volkswagen: "#3a7bd5",
+  Ford: "#57a0d3",
+  Honda: "#f2c94c",
+  Nissan: "#9b59b6",
+  Hyundai: "#2ecc71",
+  BMW: "#f2994a",
+  Mercedes: "#b8c1cc",
 };
 
-let obstacles = [];
-let score = 0;
-let best = Number(localStorage.getItem("bar-racer-best") || 0);
-let speed = 260;
-let crashed = false;
+let playing = true;
+let timeline = 0;
 let lastTime = performance.now();
-let spawnTimer = 0;
+const secondsPerFrame = 1.6;
 
-bestElement.textContent = best;
-
-function resetGame() {
-  obstacles = [];
-  score = 0;
-  speed = 260;
-  crashed = false;
-  spawnTimer = 0;
-  player.y = canvas.height / 2 - player.height / 2;
-  lastTime = performance.now();
+function interpolate(start, end, progress) {
+  return start + (end - start) * progress;
 }
 
-function spawnObstacle() {
-  const gapHeight = 170;
-  const gapTop = 58 + Math.random() * (canvas.height - gapHeight - 116);
+function getCurrentFrame() {
+  const segment = Math.min(Math.floor(timeline), frames.length - 2);
+  const progress = timeline - segment;
+  const current = frames[segment];
+  const next = frames[segment + 1];
+  const labels = Object.keys(current.values);
 
-  obstacles.push({
-    x: canvas.width + 40,
-    width: 36,
-    gapTop,
-    gapHeight,
-    passed: false,
+  return {
+    year: Math.round(interpolate(current.year, next.year, progress)),
+    rows: labels
+      .map((label) => ({
+        label,
+        value: interpolate(current.values[label], next.values[label], progress),
+      }))
+      .sort((a, b) => b.value - a.value),
+  };
+}
+
+function drawRoundedRect(x, y, width, height, radius) {
+  const right = x + width;
+  const bottom = y + height;
+
+  context.beginPath();
+  context.moveTo(x + radius, y);
+  context.lineTo(right - radius, y);
+  context.quadraticCurveTo(right, y, right, y + radius);
+  context.lineTo(right, bottom - radius);
+  context.quadraticCurveTo(right, bottom, right - radius, bottom);
+  context.lineTo(x + radius, bottom);
+  context.quadraticCurveTo(x, bottom, x, bottom - radius);
+  context.lineTo(x, y + radius);
+  context.quadraticCurveTo(x, y, x + radius, y);
+  context.closePath();
+  context.fill();
+}
+
+function render() {
+  const { year, rows } = getCurrentFrame();
+  const topRows = rows.slice(0, 8);
+  const maxValue = Math.max(...topRows.map((row) => row.value));
+  const margin = { top: 54, right: 112, bottom: 48, left: 158 };
+  const rowGap = 13;
+  const rowHeight =
+    (canvas.height - margin.top - margin.bottom - rowGap * (topRows.length - 1)) /
+    topRows.length;
+  const chartWidth = canvas.width - margin.left - margin.right;
+
+  yearElement.textContent = year;
+  leaderElement.textContent = `${topRows[0].label} ${topRows[0].value.toFixed(1)}%`;
+
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "#0e1117";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  context.fillStyle = "rgba(245, 247, 250, 0.07)";
+  context.font = "700 144px system-ui";
+  context.textAlign = "right";
+  context.fillText(String(year), canvas.width - 48, canvas.height - 44);
+
+  context.font = "600 18px system-ui";
+  context.textAlign = "right";
+  context.fillStyle = "#f5f7fa";
+
+  topRows.forEach((row, index) => {
+    const y = margin.top + index * (rowHeight + rowGap);
+    const barWidth = (row.value / maxValue) * chartWidth;
+
+    context.fillStyle = "#dce3ea";
+    context.fillText(row.label, margin.left - 18, y + rowHeight * 0.64);
+
+    context.fillStyle = colors[row.label] || "#42d392";
+    drawRoundedRect(margin.left, y, barWidth, rowHeight, 8);
+
+    context.fillStyle = "#f5f7fa";
+    context.textAlign = "left";
+    context.fillText(`${row.value.toFixed(1)}%`, margin.left + barWidth + 14, y + rowHeight * 0.64);
+    context.textAlign = "right";
   });
 }
 
 function update(delta) {
-  if (crashed) return;
+  if (!playing) return;
 
-  const direction =
-    Number(keys.has("ArrowDown") || keys.has("s")) -
-    Number(keys.has("ArrowUp") || keys.has("w"));
-
-  player.y += direction * player.speed * delta;
-  player.y = Math.max(28, Math.min(canvas.height - player.height - 28, player.y));
-
-  spawnTimer -= delta;
-  if (spawnTimer <= 0) {
-    spawnObstacle();
-    spawnTimer = Math.max(0.72, 1.35 - score * 0.012);
+  timeline += delta / secondsPerFrame;
+  if (timeline >= frames.length - 1) {
+    timeline = 0;
   }
-
-  speed += delta * 7;
-  obstacles.forEach((obstacle) => {
-    obstacle.x -= speed * delta;
-
-    if (!obstacle.passed && obstacle.x + obstacle.width < player.x) {
-      obstacle.passed = true;
-      score += 1;
-      scoreElement.textContent = score;
-
-      if (score > best) {
-        best = score;
-        bestElement.textContent = best;
-        localStorage.setItem("bar-racer-best", String(best));
-      }
-    }
-  });
-
-  obstacles = obstacles.filter((obstacle) => obstacle.x + obstacle.width > -40);
-
-  crashed = obstacles.some((obstacle) => {
-    const overlapsX =
-      player.x < obstacle.x + obstacle.width && player.x + player.width > obstacle.x;
-    const hitsTop = player.y < obstacle.gapTop;
-    const hitsBottom = player.y + player.height > obstacle.gapTop + obstacle.gapHeight;
-    return overlapsX && (hitsTop || hitsBottom);
-  });
-}
-
-function drawTrack() {
-  context.fillStyle = "#0d1117";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-
-  context.strokeStyle = "#26313d";
-  context.lineWidth = 2;
-  context.setLineDash([18, 18]);
-  context.beginPath();
-  context.moveTo(0, canvas.height / 2);
-  context.lineTo(canvas.width, canvas.height / 2);
-  context.stroke();
-  context.setLineDash([]);
-}
-
-function drawPlayer() {
-  context.fillStyle = crashed ? "#ff5d5d" : "#42d392";
-  context.fillRect(player.x, player.y, player.width, player.height);
-
-  context.fillStyle = "#101216";
-  context.fillRect(player.x + 7, player.y + 10, player.width - 14, player.height - 20);
-}
-
-function drawObstacles() {
-  context.fillStyle = "#f4c430";
-  obstacles.forEach((obstacle) => {
-    context.fillRect(obstacle.x, 0, obstacle.width, obstacle.gapTop);
-    context.fillRect(
-      obstacle.x,
-      obstacle.gapTop + obstacle.gapHeight,
-      obstacle.width,
-      canvas.height - obstacle.gapTop - obstacle.gapHeight,
-    );
-  });
-}
-
-function drawCrashMessage() {
-  if (!crashed) return;
-
-  context.fillStyle = "rgba(16, 18, 22, 0.72)";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-
-  context.fillStyle = "#f5f7fa";
-  context.font = "700 42px system-ui";
-  context.textAlign = "center";
-  context.fillText("Crash", canvas.width / 2, canvas.height / 2 - 12);
-
-  context.fillStyle = "#a8b0bc";
-  context.font = "20px system-ui";
-  context.fillText("Press Space to restart", canvas.width / 2, canvas.height / 2 + 28);
-}
-
-function render() {
-  drawTrack();
-  drawObstacles();
-  drawPlayer();
-  drawCrashMessage();
 }
 
 function loop(now) {
-  const delta = Math.min((now - lastTime) / 1000, 0.033);
+  const delta = Math.min((now - lastTime) / 1000, 0.05);
   lastTime = now;
 
   update(delta);
@@ -156,18 +204,16 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
-window.addEventListener("keydown", (event) => {
-  keys.add(event.key);
-
-  if (event.code === "Space" && crashed) {
-    resetGame();
-  }
+playToggle.addEventListener("click", () => {
+  playing = !playing;
+  playToggle.textContent = playing ? "Pause" : "Play";
 });
 
-window.addEventListener("keyup", (event) => {
-  keys.delete(event.key);
+resetButton.addEventListener("click", () => {
+  timeline = 0;
+  playing = true;
+  playToggle.textContent = "Pause";
 });
 
-resetGame();
+render();
 requestAnimationFrame(loop);
-

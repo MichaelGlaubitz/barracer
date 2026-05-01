@@ -6,7 +6,8 @@
   --muted: #a8b0bc;
   --line: #2c333d;
   --accent: #42d392;
-  --danger: #ff5d5d;
+  --button: #f5f7fa;
+  --button-text: #101216;
 }
 
 * {
@@ -71,11 +72,27 @@ h1 {
 }
 
 .stats span,
-.controls span {
+.controls span,
+button {
   border: 1px solid var(--line);
   background: var(--panel);
   border-radius: 8px;
   padding: 8px 10px;
+}
+
+button {
+  min-width: 88px;
+  color: var(--button-text);
+  background: var(--button);
+  border-color: var(--button);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+button:hover {
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .stats strong {
@@ -108,4 +125,3 @@ canvas {
     justify-content: flex-start;
   }
 }
-
