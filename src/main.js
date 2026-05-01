@@ -96,6 +96,16 @@ const palette = [
   "#50c8c8",
 ];
 
+function getColorForLabel(label) {
+  let hash = 0;
+
+  for (let index = 0; index < label.length; index += 1) {
+    hash = (hash * 31 + label.charCodeAt(index)) % 997;
+  }
+
+  return palette[hash % palette.length];
+}
+
 let frames = [];
 let activeDataset = datasetCatalog[0];
 let sourceLabel = "World Bank Open Data";
@@ -104,6 +114,7 @@ let playing = true;
 let timeline = 0;
 let lastTime = performance.now();
 let secondsPerFrame = 1.45;
+const barLayout = new Map();
 
 function getSelectedDataset() {
   return (
@@ -315,6 +326,7 @@ function render() {
     (canvas.height - margin.top - margin.bottom - rowGap * (topRows.length - 1)) /
     topRows.length;
   const chartWidth = canvas.width - margin.left - margin.right;
+  const visibleLabels = new Set(topRows.map((row) => row.label));
 
   yearElement.textContent = year;
   leaderElement.textContent = `${topRows[0].label} ${formatValue(topRows[0].value)}`;
@@ -332,14 +344,18 @@ function render() {
   context.font = "600 17px system-ui";
   context.textAlign = "right";
 
-  topRows.forEach((row, index) => {
-    const y = margin.top + index * (rowHeight + rowGap);
+  topRows.forEach((row, rank) => {
+    const targetY = margin.top + rank * (rowHeight + rowGap);
+    const currentY = barLayout.has(row.label) ? barLayout.get(row.label) : targetY;
+    const y = currentY + (targetY - currentY) * 0.18;
     const barWidth = Math.max((row.value / maxValue) * chartWidth, 2);
+
+    barLayout.set(row.label, y);
 
     context.fillStyle = "#dce3ea";
     context.fillText(row.label, margin.left - 18, y + rowHeight * 0.64);
 
-    context.fillStyle = palette[index % palette.length];
+    context.fillStyle = getColorForLabel(row.label);
     drawRoundedRect(margin.left, y, barWidth, rowHeight, 8);
 
     context.fillStyle = "#f5f7fa";
@@ -347,11 +363,18 @@ function render() {
     context.fillText(formatValue(row.value), margin.left + barWidth + 14, y + rowHeight * 0.64);
     context.textAlign = "right";
   });
+
+  [...barLayout.keys()].forEach((label) => {
+    if (!visibleLabels.has(label)) {
+      barLayout.delete(label);
+    }
+  });
 }
 
 function resetTimeline() {
   timeline = 0;
   lastTime = performance.now();
+  barLayout.clear();
 }
 
 function applyPromptHints(prompt, start, end) {
