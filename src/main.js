@@ -2,123 +2,245 @@ const canvas = document.querySelector("#chart");
 const context = canvas.getContext("2d");
 const yearElement = document.querySelector("#year");
 const leaderElement = document.querySelector("#leader");
+const sourceElement = document.querySelector("#source");
+const statusElement = document.querySelector("#status");
+const datasetDialog = document.querySelector("#datasetDialog");
+const datasetForm = document.querySelector("#datasetForm");
+const dataPrompt = document.querySelector("#dataPrompt");
+const startYearInput = document.querySelector("#startYear");
+const endYearInput = document.querySelector("#endYear");
+const topCountInput = document.querySelector("#topCount");
+const cancelDialogButton = document.querySelector("#cancelDialog");
+const openDialogButton = document.querySelector("#openDialog");
 const playToggle = document.querySelector("#playToggle");
 const resetButton = document.querySelector("#resetButton");
 
-const frames = [
+const countries = [
+  { code: "USA", name: "United States" },
+  { code: "CHN", name: "China" },
+  { code: "JPN", name: "Japan" },
+  { code: "DEU", name: "Germany" },
+  { code: "IND", name: "India" },
+  { code: "GBR", name: "United Kingdom" },
+  { code: "FRA", name: "France" },
+  { code: "ITA", name: "Italy" },
+  { code: "BRA", name: "Brazil" },
+  { code: "CAN", name: "Canada" },
+  { code: "KOR", name: "South Korea" },
+  { code: "AUS", name: "Australia" },
+  { code: "ESP", name: "Spain" },
+  { code: "MEX", name: "Mexico" },
+  { code: "IDN", name: "Indonesia" },
+];
+
+const datasetCatalog = [
   {
-    year: 2019,
-    values: {
-      Toyota: 10.2,
-      Volkswagen: 9.4,
-      Ford: 6.1,
-      Honda: 5.8,
-      Nissan: 5.1,
-      Hyundai: 4.7,
-      BMW: 3.0,
-      Mercedes: 2.8,
-    },
+    label: "GDP",
+    indicator: "NY.GDP.MKTP.CD",
+    unit: "USD",
+    scale: 1_000_000_000_000,
+    suffix: "T",
+    keywords: ["gdp", "bip", "wirtschaft", "gross domestic", "bruttoinlandsprodukt"],
   },
   {
-    year: 2020,
-    values: {
-      Toyota: 10.8,
-      Volkswagen: 8.9,
-      Ford: 5.6,
-      Honda: 5.4,
-      Nissan: 4.8,
-      Hyundai: 5.0,
-      BMW: 3.2,
-      Mercedes: 2.9,
-    },
+    label: "Population",
+    indicator: "SP.POP.TOTL",
+    unit: "people",
+    scale: 1_000_000,
+    suffix: "M",
+    keywords: ["population", "bevoelkerung", "einwohner", "menschen"],
   },
   {
-    year: 2021,
-    values: {
-      Toyota: 11.4,
-      Volkswagen: 8.6,
-      Ford: 5.2,
-      Honda: 5.0,
-      Nissan: 4.6,
-      Hyundai: 5.4,
-      BMW: 3.4,
-      Mercedes: 3.1,
-    },
+    label: "CO2 emissions",
+    indicator: "EN.ATM.CO2E.KT",
+    unit: "kt",
+    scale: 1_000,
+    suffix: "M kt",
+    keywords: ["co2", "emission", "klima", "carbon"],
   },
   {
-    year: 2022,
-    values: {
-      Toyota: 11.7,
-      Volkswagen: 8.1,
-      Ford: 5.0,
-      Honda: 4.8,
-      Nissan: 4.3,
-      Hyundai: 5.8,
-      BMW: 3.5,
-      Mercedes: 3.2,
-    },
+    label: "Internet users",
+    indicator: "IT.NET.USER.ZS",
+    unit: "%",
+    scale: 1,
+    suffix: "%",
+    keywords: ["internet", "online", "web", "nutzer"],
   },
   {
-    year: 2023,
-    values: {
-      Toyota: 12.0,
-      Volkswagen: 7.9,
-      Ford: 4.8,
-      Honda: 4.7,
-      Nissan: 4.1,
-      Hyundai: 6.0,
-      BMW: 3.7,
-      Mercedes: 3.4,
-    },
-  },
-  {
-    year: 2024,
-    values: {
-      Toyota: 12.3,
-      Volkswagen: 7.7,
-      Ford: 4.6,
-      Honda: 4.8,
-      Nissan: 4.0,
-      Hyundai: 6.3,
-      BMW: 3.9,
-      Mercedes: 3.5,
-    },
+    label: "Electric power use",
+    indicator: "EG.USE.ELEC.KH.PC",
+    unit: "kWh/person",
+    scale: 1,
+    suffix: "kWh/person",
+    keywords: ["strom", "electric", "power", "energie"],
   },
 ];
 
-const colors = {
-  Toyota: "#e84c3d",
-  Volkswagen: "#3a7bd5",
-  Ford: "#57a0d3",
-  Honda: "#f2c94c",
-  Nissan: "#9b59b6",
-  Hyundai: "#2ecc71",
-  BMW: "#f2994a",
-  Mercedes: "#b8c1cc",
-};
+const palette = [
+  "#e84c3d",
+  "#3a7bd5",
+  "#57a0d3",
+  "#f2c94c",
+  "#9b59b6",
+  "#2ecc71",
+  "#f2994a",
+  "#b8c1cc",
+  "#ff7aa2",
+  "#50c8c8",
+];
 
+let frames = [];
+let activeDataset = datasetCatalog[0];
+let sourceLabel = "World Bank Open Data";
+let topCount = 8;
 let playing = true;
 let timeline = 0;
 let lastTime = performance.now();
-const secondsPerFrame = 1.6;
+let secondsPerFrame = 1.45;
 
-function interpolate(start, end, progress) {
-  return start + (end - start) * progress;
+function pickDataset(prompt) {
+  const normalized = prompt.toLowerCase();
+  return (
+    datasetCatalog.find((dataset) =>
+      dataset.keywords.some((keyword) => normalized.includes(keyword)),
+    ) || datasetCatalog[0]
+  );
+}
+
+function setStatus(message, isError = false) {
+  statusElement.textContent = message;
+  statusElement.dataset.state = isError ? "error" : "ready";
+}
+
+function formatValue(value, dataset = activeDataset) {
+  if (!Number.isFinite(value)) return "n/a";
+  const scaled = value / dataset.scale;
+
+  if (dataset.suffix === "%") {
+    return `${scaled.toFixed(1)}%`;
+  }
+
+  if (Math.abs(scaled) >= 100) {
+    return `${scaled.toFixed(0)} ${dataset.suffix}`;
+  }
+
+  if (Math.abs(scaled) >= 10) {
+    return `${scaled.toFixed(1)} ${dataset.suffix}`;
+  }
+
+  return `${scaled.toFixed(2)} ${dataset.suffix}`;
+}
+
+function normalizeYear(value, fallback) {
+  const year = Number(value);
+  return Number.isFinite(year) ? year : fallback;
+}
+
+function clampPeriod(requestedStart, requestedEnd, availableYears) {
+  const minYear = Math.min(...availableYears);
+  const maxYear = Math.max(...availableYears);
+  const start = Math.max(Math.min(requestedStart, requestedEnd), minYear);
+  const end = Math.min(Math.max(requestedStart, requestedEnd), maxYear);
+
+  if (end - start < 2) {
+    return {
+      start: Math.max(minYear, maxYear - 5),
+      end: maxYear,
+      adjusted: true,
+    };
+  }
+
+  return {
+    start,
+    end,
+    adjusted: start !== requestedStart || end !== requestedEnd,
+  };
+}
+
+async function fetchWorldBankSeries(dataset, requestedStart, requestedEnd) {
+  const countryCodes = countries.map((country) => country.code).join(";");
+  const url = new URL(
+    `https://api.worldbank.org/v2/country/${countryCodes}/indicator/${dataset.indicator}`,
+  );
+  url.searchParams.set("format", "json");
+  url.searchParams.set("per_page", "20000");
+  url.searchParams.set("date", `${requestedStart - 6}:${requestedEnd + 1}`);
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`World Bank request failed with ${response.status}`);
+  }
+
+  const [, rows] = await response.json();
+  const valuesByYear = new Map();
+  const countryNames = new Map(countries.map((country) => [country.code, country.name]));
+
+  rows
+    .filter((row) => row.value !== null && countryNames.has(row.countryiso3code))
+    .forEach((row) => {
+      const year = Number(row.date);
+      if (!valuesByYear.has(year)) {
+        valuesByYear.set(year, {});
+      }
+
+      valuesByYear.get(year)[countryNames.get(row.countryiso3code)] = row.value;
+    });
+
+  const availableYears = [...valuesByYear.keys()].filter(
+    (year) => Object.keys(valuesByYear.get(year)).length >= 4,
+  );
+
+  if (availableYears.length < 2) {
+    throw new Error("Not enough data points returned for this request.");
+  }
+
+  const period = clampPeriod(requestedStart, requestedEnd, availableYears);
+  const preparedFrames = [];
+
+  for (let year = period.start; year <= period.end; year += 1) {
+    const values = valuesByYear.get(year);
+    if (values && Object.keys(values).length >= 4) {
+      preparedFrames.push({ year, values });
+    }
+  }
+
+  if (preparedFrames.length < 2) {
+    throw new Error("The adjusted period still has too little comparable data.");
+  }
+
+  return {
+    frames: preparedFrames.sort((a, b) => a.year - b.year),
+    adjusted: period.adjusted,
+    period,
+  };
 }
 
 function getCurrentFrame() {
+  if (frames.length === 1) {
+    return {
+      year: frames[0].year,
+      rows: Object.entries(frames[0].values)
+        .map(([label, value]) => ({ label, value }))
+        .sort((a, b) => b.value - a.value),
+    };
+  }
+
   const segment = Math.min(Math.floor(timeline), frames.length - 2);
   const progress = timeline - segment;
   const current = frames[segment];
   const next = frames[segment + 1];
-  const labels = Object.keys(current.values);
+  const labels = new Set([...Object.keys(current.values), ...Object.keys(next.values)]);
 
   return {
-    year: Math.round(interpolate(current.year, next.year, progress)),
-    rows: labels
+    year: Math.round(current.year + (next.year - current.year) * progress),
+    rows: [...labels]
       .map((label) => ({
         label,
-        value: interpolate(current.values[label], next.values[label], progress),
+        value:
+          (current.values[label] ?? next.values[label] ?? 0) +
+          ((next.values[label] ?? current.values[label] ?? 0) -
+            (current.values[label] ?? next.values[label] ?? 0)) *
+            progress,
       }))
       .sort((a, b) => b.value - a.value),
   };
@@ -142,19 +264,38 @@ function drawRoundedRect(x, y, width, height, radius) {
   context.fill();
 }
 
+function renderEmptyState() {
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "#0e1117";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "#f5f7fa";
+  context.font = "700 34px system-ui";
+  context.textAlign = "center";
+  context.fillText("Waehle ein Thema aus", canvas.width / 2, canvas.height / 2 - 12);
+  context.fillStyle = "#a8b0bc";
+  context.font = "18px system-ui";
+  context.fillText("Die App laedt danach passende Open-Data-Zeitreihen.", canvas.width / 2, canvas.height / 2 + 28);
+}
+
 function render() {
+  if (!frames.length) {
+    renderEmptyState();
+    return;
+  }
+
   const { year, rows } = getCurrentFrame();
-  const topRows = rows.slice(0, 8);
-  const maxValue = Math.max(...topRows.map((row) => row.value));
-  const margin = { top: 54, right: 112, bottom: 48, left: 158 };
-  const rowGap = 13;
+  const topRows = rows.slice(0, topCount);
+  const maxValue = Math.max(...topRows.map((row) => row.value), 1);
+  const margin = { top: 54, right: 132, bottom: 48, left: 178 };
+  const rowGap = 12;
   const rowHeight =
     (canvas.height - margin.top - margin.bottom - rowGap * (topRows.length - 1)) /
     topRows.length;
   const chartWidth = canvas.width - margin.left - margin.right;
 
   yearElement.textContent = year;
-  leaderElement.textContent = `${topRows[0].label} ${topRows[0].value.toFixed(1)}%`;
+  leaderElement.textContent = `${topRows[0].label} ${formatValue(topRows[0].value)}`;
+  sourceElement.textContent = sourceLabel;
 
   context.clearRect(0, 0, canvas.width, canvas.height);
   context.fillStyle = "#0e1117";
@@ -165,29 +306,60 @@ function render() {
   context.textAlign = "right";
   context.fillText(String(year), canvas.width - 48, canvas.height - 44);
 
-  context.font = "600 18px system-ui";
+  context.font = "600 17px system-ui";
   context.textAlign = "right";
-  context.fillStyle = "#f5f7fa";
 
   topRows.forEach((row, index) => {
     const y = margin.top + index * (rowHeight + rowGap);
-    const barWidth = (row.value / maxValue) * chartWidth;
+    const barWidth = Math.max((row.value / maxValue) * chartWidth, 2);
 
     context.fillStyle = "#dce3ea";
     context.fillText(row.label, margin.left - 18, y + rowHeight * 0.64);
 
-    context.fillStyle = colors[row.label] || "#42d392";
+    context.fillStyle = palette[index % palette.length];
     drawRoundedRect(margin.left, y, barWidth, rowHeight, 8);
 
     context.fillStyle = "#f5f7fa";
     context.textAlign = "left";
-    context.fillText(`${row.value.toFixed(1)}%`, margin.left + barWidth + 14, y + rowHeight * 0.64);
+    context.fillText(formatValue(row.value), margin.left + barWidth + 14, y + rowHeight * 0.64);
     context.textAlign = "right";
   });
 }
 
+function resetTimeline() {
+  timeline = 0;
+  lastTime = performance.now();
+}
+
+async function loadDatasetFromForm() {
+  const prompt = dataPrompt.value.trim() || "GDP by country";
+  const dataset = pickDataset(prompt);
+  const requestedStart = normalizeYear(startYearInput.value, 2014);
+  const requestedEnd = normalizeYear(endYearInput.value, new Date().getFullYear() - 1);
+  const requestedTopCount = Number(topCountInput.value);
+
+  topCount = Number.isFinite(requestedTopCount)
+    ? Math.max(4, Math.min(10, requestedTopCount))
+    : 8;
+  activeDataset = dataset;
+  sourceLabel = `World Bank Open Data: ${dataset.label}`;
+  setStatus(`Lade ${dataset.label} ...`);
+
+  const result = await fetchWorldBankSeries(dataset, requestedStart, requestedEnd);
+  frames = result.frames;
+  secondsPerFrame = frames.length > 12 ? 0.92 : 1.35;
+  resetTimeline();
+  playing = true;
+  playToggle.textContent = "Pause";
+
+  const periodText = `${frames[0].year}-${frames[frames.length - 1].year}`;
+  const adjustment = result.adjusted ? " Zeitraum automatisch angepasst." : "";
+  setStatus(`${dataset.label} geladen (${periodText}).${adjustment}`);
+  datasetDialog.close();
+}
+
 function update(delta) {
-  if (!playing) return;
+  if (!playing || frames.length < 2) return;
 
   timeline += delta / secondsPerFrame;
   if (timeline >= frames.length - 1) {
@@ -204,16 +376,45 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
+openDialogButton.addEventListener("click", () => {
+  datasetDialog.showModal();
+});
+
+cancelDialogButton.addEventListener("click", () => {
+  datasetDialog.close();
+});
+
+datasetForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  try {
+    await loadDatasetFromForm();
+  } catch (error) {
+    setStatus(
+      "Die Daten konnten nicht geladen werden. Versuche z. B. GDP, Bevoelkerung, CO2 oder Internet.",
+      true,
+    );
+    console.error(error);
+  }
+});
+
 playToggle.addEventListener("click", () => {
   playing = !playing;
   playToggle.textContent = playing ? "Pause" : "Play";
 });
 
 resetButton.addEventListener("click", () => {
-  timeline = 0;
+  resetTimeline();
   playing = true;
   playToggle.textContent = "Pause";
 });
 
+datasetDialog.addEventListener("click", (event) => {
+  if (event.target === datasetDialog) {
+    datasetDialog.close();
+  }
+});
+
+datasetDialog.showModal();
 render();
 requestAnimationFrame(loop);

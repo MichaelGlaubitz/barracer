@@ -11,21 +11,67 @@
       <section class="hud" aria-label="Diagrammstatus">
         <div>
           <p class="eyebrow">Bar Racer</p>
-          <h1>Automarken nach Marktanteil</h1>
+          <h1>Open Data Bar Race</h1>
         </div>
         <div class="stats">
-          <span>Jahr <strong id="year">2019</strong></span>
-          <span>Fuehrend <strong id="leader">Toyota 10.2%</strong></span>
+          <span>Jahr <strong id="year">-</strong></span>
+          <span>Fuehrend <strong id="leader">-</strong></span>
+          <span>Quelle <strong id="source">-</strong></span>
         </div>
       </section>
 
       <canvas id="chart" width="1120" height="630" aria-label="Animiertes Balkendiagramm fuer Automarken"></canvas>
 
       <footer class="controls" aria-label="Diagrammsteuerung">
+        <button id="openDialog" type="button">Daten waehlen</button>
         <button id="playToggle" type="button">Pause</button>
         <button id="resetButton" type="button">Reset</button>
-        <span>Demo-Daten: globale Marktanteile in Prozent</span>
+        <span id="status">Bereit fuer Open Data</span>
       </footer>
+
+      <dialog id="datasetDialog" aria-labelledby="dialogTitle">
+        <form id="datasetForm" class="dialog-panel">
+          <div>
+            <p class="eyebrow">Datenassistent</p>
+            <h2 id="dialogTitle">Was soll dargestellt werden?</h2>
+          </div>
+
+          <label>
+            Thema
+            <input
+              id="dataPrompt"
+              name="dataPrompt"
+              type="text"
+              value="GDP nach Laendern"
+              placeholder="z. B. Bevoelkerung, CO2, Internet, GDP"
+            />
+          </label>
+
+          <div class="field-grid">
+            <label>
+              Von
+              <input id="startYear" name="startYear" type="number" value="2014" min="1960" max="2030" />
+            </label>
+            <label>
+              Bis
+              <input id="endYear" name="endYear" type="number" value="2024" min="1960" max="2030" />
+            </label>
+            <label>
+              Top
+              <input id="topCount" name="topCount" type="number" value="8" min="4" max="10" />
+            </label>
+          </div>
+
+          <p class="hint">
+            Nutzt World Bank Open Data ohne API-Key. Der Zeitraum wird automatisch auf verfuegbare Jahre angepasst.
+          </p>
+
+          <menu>
+            <button id="cancelDialog" type="button" value="cancel">Abbrechen</button>
+            <button type="submit">Daten laden</button>
+          </menu>
+        </form>
+      </dialog>
     </main>
 
     <script type="module" src="./src/main.js"></script>

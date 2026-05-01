@@ -6,6 +6,7 @@
   --muted: #a8b0bc;
   --line: #2c333d;
   --accent: #42d392;
+  --danger: #ff5d5d;
   --button: #f5f7fa;
   --button-text: #101216;
 }
@@ -95,6 +96,12 @@ button:hover {
   border-color: var(--accent);
 }
 
+button[value="cancel"] {
+  color: var(--text);
+  background: var(--panel);
+  border-color: var(--line);
+}
+
 .stats strong {
   color: var(--text);
   margin-left: 4px;
@@ -107,6 +114,74 @@ canvas {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #0d1117;
+}
+
+dialog {
+  width: min(560px, calc(100vw - 32px));
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+dialog::backdrop {
+  background: rgba(7, 9, 12, 0.72);
+}
+
+.dialog-panel {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #181c22;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+}
+
+h2 {
+  margin: 0;
+  font-size: 1.55rem;
+}
+
+label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+input {
+  width: 100%;
+  color: var(--text);
+  background: #101216;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+menu {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+#status[data-state="error"] {
+  color: var(--danger);
 }
 
 @media (max-width: 640px) {
@@ -123,5 +198,13 @@ canvas {
 
   .stats {
     justify-content: flex-start;
+  }
+
+  .field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  menu {
+    flex-direction: column-reverse;
   }
 }
