@@ -37,13 +37,20 @@
           </div>
 
           <label>
-            Thema
+            Datensatz
+            <select id="datasetSelect" name="datasetSelect"></select>
+          </label>
+
+          <p id="datasetDescription" class="dataset-description"></p>
+
+          <label>
+            Optionale Beschreibung
             <input
               id="dataPrompt"
               name="dataPrompt"
               type="text"
-              value="GDP nach Laendern"
-              placeholder="z. B. Bevoelkerung, CO2, Internet, GDP"
+              value=""
+              placeholder="z. B. Fokus auf groessere Laender, langer Zeitraum"
             />
           </label>
 

@@ -6,6 +6,8 @@ const sourceElement = document.querySelector("#source");
 const statusElement = document.querySelector("#status");
 const datasetDialog = document.querySelector("#datasetDialog");
 const datasetForm = document.querySelector("#datasetForm");
+const datasetSelect = document.querySelector("#datasetSelect");
+const datasetDescription = document.querySelector("#datasetDescription");
 const dataPrompt = document.querySelector("#dataPrompt");
 const startYearInput = document.querySelector("#startYear");
 const endYearInput = document.querySelector("#endYear");
@@ -37,6 +39,7 @@ const datasetCatalog = [
   {
     label: "GDP",
     indicator: "NY.GDP.MKTP.CD",
+    description: "Bruttoinlandsprodukt nach Laendern in aktuellen US-Dollar.",
     unit: "USD",
     scale: 1_000_000_000_000,
     suffix: "T",
@@ -45,6 +48,7 @@ const datasetCatalog = [
   {
     label: "Population",
     indicator: "SP.POP.TOTL",
+    description: "Gesamtbevoelkerung nach Laendern.",
     unit: "people",
     scale: 1_000_000,
     suffix: "M",
@@ -53,6 +57,7 @@ const datasetCatalog = [
   {
     label: "CO2 emissions",
     indicator: "EN.ATM.CO2E.KT",
+    description: "CO2-Emissionen nach Laendern in Kilotonnen.",
     unit: "kt",
     scale: 1_000,
     suffix: "M kt",
@@ -61,6 +66,7 @@ const datasetCatalog = [
   {
     label: "Internet users",
     indicator: "IT.NET.USER.ZS",
+    description: "Anteil der Internetnutzer an der Bevoelkerung.",
     unit: "%",
     scale: 1,
     suffix: "%",
@@ -69,6 +75,7 @@ const datasetCatalog = [
   {
     label: "Electric power use",
     indicator: "EG.USE.ELEC.KH.PC",
+    description: "Stromverbrauch pro Kopf in Kilowattstunden.",
     unit: "kWh/person",
     scale: 1,
     suffix: "kWh/person",
@@ -98,13 +105,29 @@ let timeline = 0;
 let lastTime = performance.now();
 let secondsPerFrame = 1.45;
 
-function pickDataset(prompt) {
-  const normalized = prompt.toLowerCase();
+function getSelectedDataset() {
   return (
-    datasetCatalog.find((dataset) =>
-      dataset.keywords.some((keyword) => normalized.includes(keyword)),
-    ) || datasetCatalog[0]
+    datasetCatalog.find((dataset) => dataset.indicator === datasetSelect.value) ||
+    datasetCatalog[0]
   );
+}
+
+function syncDatasetDescription() {
+  const dataset = getSelectedDataset();
+  datasetDescription.textContent = `${dataset.description} Quelle: World Bank (${dataset.indicator}).`;
+}
+
+function populateDatasetSelect() {
+  datasetSelect.replaceChildren(
+    ...datasetCatalog.map((dataset) => {
+      const option = document.createElement("option");
+      option.value = dataset.indicator;
+      option.textContent = dataset.label;
+      return option;
+    }),
+  );
+  datasetSelect.value = datasetCatalog[0].indicator;
+  syncDatasetDescription();
 }
 
 function setStatus(message, isError = false) {
@@ -331,11 +354,29 @@ function resetTimeline() {
   lastTime = performance.now();
 }
 
+function applyPromptHints(prompt, start, end) {
+  const normalized = prompt.toLowerCase();
+  const latestCompleteYear = new Date().getFullYear() - 1;
+
+  if (normalized.includes("lang") || normalized.includes("max")) {
+    return { start: Math.min(start, 1990), end: Math.max(end, latestCompleteYear) };
+  }
+
+  if (normalized.includes("kurz") || normalized.includes("aktuell")) {
+    return { start: Math.max(start, latestCompleteYear - 6), end: Math.max(end, latestCompleteYear) };
+  }
+
+  return { start, end };
+}
+
 async function loadDatasetFromForm() {
-  const prompt = dataPrompt.value.trim() || "GDP by country";
-  const dataset = pickDataset(prompt);
-  const requestedStart = normalizeYear(startYearInput.value, 2014);
-  const requestedEnd = normalizeYear(endYearInput.value, new Date().getFullYear() - 1);
+  const prompt = dataPrompt.value.trim();
+  const dataset = getSelectedDataset();
+  const requestedPeriod = applyPromptHints(
+    prompt,
+    normalizeYear(startYearInput.value, 2014),
+    normalizeYear(endYearInput.value, new Date().getFullYear() - 1),
+  );
   const requestedTopCount = Number(topCountInput.value);
 
   topCount = Number.isFinite(requestedTopCount)
@@ -345,7 +386,7 @@ async function loadDatasetFromForm() {
   sourceLabel = `World Bank Open Data: ${dataset.label}`;
   setStatus(`Lade ${dataset.label} ...`);
 
-  const result = await fetchWorldBankSeries(dataset, requestedStart, requestedEnd);
+  const result = await fetchWorldBankSeries(dataset, requestedPeriod.start, requestedPeriod.end);
   frames = result.frames;
   secondsPerFrame = frames.length > 12 ? 0.92 : 1.35;
   resetTimeline();
@@ -379,6 +420,8 @@ function loop(now) {
 openDialogButton.addEventListener("click", () => {
   datasetDialog.showModal();
 });
+
+datasetSelect.addEventListener("change", syncDatasetDescription);
 
 cancelDialogButton.addEventListener("click", () => {
   datasetDialog.close();
@@ -415,6 +458,7 @@ datasetDialog.addEventListener("click", (event) => {
   }
 });
 
+populateDatasetSelect();
 datasetDialog.showModal();
 render();
 requestAnimationFrame(loop);

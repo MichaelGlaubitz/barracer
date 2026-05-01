@@ -11,8 +11,9 @@ Data time series from a built-in data dialog.
 
 ## Run
 
-Open `index.html` in a browser. Choose a topic in the data dialog, for example
-`GDP`, `Bevoelkerung`, `CO2`, `Internet`, or `Strom`.
+Open `index.html` in a browser. Choose a dataset in the data dialog, for
+example `GDP`, `Population`, `CO2 emissions`, `Internet users`, or
+`Electric power use`.
 
 Controls:
 
