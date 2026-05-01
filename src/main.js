@@ -38,6 +38,7 @@ const countries = [
 const datasetCatalog = [
   {
     label: "GDP",
+    provider: "worldBank",
     indicator: "NY.GDP.MKTP.CD",
     description: "Bruttoinlandsprodukt nach Laendern in aktuellen US-Dollar.",
     unit: "USD",
@@ -47,6 +48,7 @@ const datasetCatalog = [
   },
   {
     label: "Population",
+    provider: "worldBank",
     indicator: "SP.POP.TOTL",
     description: "Gesamtbevoelkerung nach Laendern.",
     unit: "people",
@@ -56,6 +58,7 @@ const datasetCatalog = [
   },
   {
     label: "CO2 emissions",
+    provider: "worldBank",
     indicator: "EN.ATM.CO2E.KT",
     description: "CO2-Emissionen nach Laendern in Kilotonnen.",
     unit: "kt",
@@ -65,6 +68,7 @@ const datasetCatalog = [
   },
   {
     label: "Internet users",
+    provider: "worldBank",
     indicator: "IT.NET.USER.ZS",
     description: "Anteil der Internetnutzer an der Bevoelkerung.",
     unit: "%",
@@ -74,6 +78,7 @@ const datasetCatalog = [
   },
   {
     label: "Electric power use",
+    provider: "worldBank",
     indicator: "EG.USE.ELEC.KH.PC",
     description: "Stromverbrauch pro Kopf in Kilowattstunden.",
     unit: "kWh/person",
@@ -81,7 +86,104 @@ const datasetCatalog = [
     suffix: "kWh/person",
     keywords: ["strom", "electric", "power", "energie"],
   },
+  {
+    label: "Most expensive football transfers",
+    provider: "staticTransfers",
+    indicator: "FOOTBALL.TRANSFERS.EUR",
+    description: "Teuerste Fussballtransfers aller Zeiten, als Ranking bis zum jeweiligen Jahr.",
+    unit: "EUR million",
+    scale: 1,
+    suffix: "M EUR",
+    defaultStart: 2000,
+    defaultEnd: 2025,
+    keywords: ["fussball", "football", "transfer", "spieler", "teuerste"],
+  },
 ];
+
+const footballTransferData = [
+  { player: "Neymar", from: "Barcelona", to: "Paris Saint-Germain", year: 2017, fee: 222 },
+  { player: "Kylian Mbappe", from: "Monaco", to: "Paris Saint-Germain", year: 2018, fee: 180 },
+  { player: "Philippe Coutinho", from: "Liverpool", to: "Barcelona", year: 2018, fee: 145 },
+  { player: "Ousmane Dembele", from: "Borussia Dortmund", to: "Barcelona", year: 2017, fee: 135 },
+  { player: "Enzo Fernandez", from: "Benfica", to: "Chelsea", year: 2023, fee: 121 },
+  { player: "Joao Felix", from: "Benfica", to: "Atletico Madrid", year: 2019, fee: 120 },
+  { player: "Antoine Griezmann", from: "Atletico Madrid", to: "Barcelona", year: 2019, fee: 120 },
+  { player: "Philippe Coutinho", from: "Liverpool", to: "Barcelona", year: 2018, fee: 118.4 },
+  { player: "Jack Grealish", from: "Aston Villa", to: "Manchester City", year: 2021, fee: 117.7 },
+  { player: "Florian Wirtz", from: "Bayer Leverkusen", to: "Liverpool", year: 2025, fee: 117.5 },
+  { player: "Declan Rice", from: "West Ham United", to: "Arsenal", year: 2023, fee: 116.5 },
+  { player: "Moises Caicedo", from: "Brighton & Hove Albion", to: "Chelsea", year: 2023, fee: 116.3 },
+  { player: "Romelu Lukaku", from: "Inter Milan", to: "Chelsea", year: 2021, fee: 115 },
+  { player: "Paul Pogba", from: "Juventus", to: "Manchester United", year: 2016, fee: 105 },
+  { player: "Jude Bellingham", from: "Borussia Dortmund", to: "Real Madrid", year: 2023, fee: 103 },
+  { player: "Eden Hazard", from: "Chelsea", to: "Real Madrid", year: 2019, fee: 100 },
+  { player: "Cristiano Ronaldo", from: "Real Madrid", to: "Juventus", year: 2018, fee: 100 },
+  { player: "Harry Kane", from: "Tottenham Hotspur", to: "Bayern Munich", year: 2023, fee: 100 },
+  { player: "Gareth Bale", from: "Tottenham Hotspur", to: "Real Madrid", year: 2013, fee: 100 },
+  { player: "Antony", from: "Ajax", to: "Manchester United", year: 2022, fee: 95 },
+  { player: "Cristiano Ronaldo", from: "Manchester United", to: "Real Madrid", year: 2009, fee: 94 },
+  { player: "Randal Kolo Muani", from: "Eintracht Frankfurt", to: "Paris Saint-Germain", year: 2023, fee: 90 },
+  { player: "Gonzalo Higuain", from: "Napoli", to: "Juventus", year: 2016, fee: 90 },
+  { player: "Harry Maguire", from: "Leicester City", to: "Manchester United", year: 2019, fee: 86.6 },
+];
+
+async function fetchFootballTransferData() {
+  const url = new URL("https://en.wikipedia.org/w/api.php");
+  url.searchParams.set("action", "parse");
+  url.searchParams.set("page", "List_of_most_expensive_association_football_transfers");
+  url.searchParams.set("prop", "text");
+  url.searchParams.set("format", "json");
+  url.searchParams.set("origin", "*");
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Wikipedia request failed with ${response.status}`);
+    }
+
+    const payload = await response.json();
+    const html = payload.parse?.text?.["*"];
+    if (!html) {
+      throw new Error("Wikipedia response did not include page HTML.");
+    }
+
+    const documentFragment = new DOMParser().parseFromString(html, "text/html");
+    const table = documentFragment.querySelector("table.wikitable");
+    const rows = [...table.querySelectorAll("tr")].slice(1);
+    const transfers = rows
+      .map((row) => {
+        const cells = [...row.querySelectorAll("th, td")].map((cell) =>
+          cell.textContent.replace(/\[[^\]]+\]/g, "").replace(/\s+/g, " ").trim(),
+        );
+
+        if (cells.length < 8) return null;
+
+        const fee = Number(cells[5].match(/[\d.]+/)?.[0]);
+        const year = Number(cells[7].match(/\d{4}/)?.[0]);
+        const player = cells[1].replace(/\s*\(\d+\)\s*$/, "");
+
+        if (!player || !Number.isFinite(fee) || !Number.isFinite(year)) return null;
+
+        return {
+          player,
+          from: cells[2],
+          to: cells[3],
+          year,
+          fee,
+        };
+      })
+      .filter(Boolean);
+
+    if (transfers.length < 8) {
+      throw new Error("Wikipedia table parser returned too few rows.");
+    }
+
+    return transfers;
+  } catch (error) {
+    console.warn("Using bundled football transfer fallback data.", error);
+    return footballTransferData;
+  }
+}
 
 const palette = [
   "#e84c3d",
@@ -125,7 +227,12 @@ function getSelectedDataset() {
 
 function syncDatasetDescription() {
   const dataset = getSelectedDataset();
-  datasetDescription.textContent = `${dataset.description} Quelle: World Bank (${dataset.indicator}).`;
+  const source =
+    dataset.provider === "worldBank"
+      ? `World Bank (${dataset.indicator})`
+      : "Wikipedia list of most expensive association football transfers";
+
+  datasetDescription.textContent = `${dataset.description} Quelle: ${source}.`;
 }
 
 function populateDatasetSelect() {
@@ -139,6 +246,16 @@ function populateDatasetSelect() {
   );
   datasetSelect.value = datasetCatalog[0].indicator;
   syncDatasetDescription();
+}
+
+function applyDatasetDefaults() {
+  const dataset = getSelectedDataset();
+  if (dataset.defaultStart) {
+    startYearInput.value = dataset.defaultStart;
+  }
+  if (dataset.defaultEnd) {
+    endYearInput.value = dataset.defaultEnd;
+  }
 }
 
 function setStatus(message, isError = false) {
@@ -247,6 +364,45 @@ async function fetchWorldBankSeries(dataset, requestedStart, requestedEnd) {
     adjusted: period.adjusted,
     period,
   };
+}
+
+async function buildTransferFrames(dataset, requestedStart, requestedEnd) {
+  const transfers = await fetchFootballTransferData();
+  const availableYears = transfers.map((transfer) => transfer.year);
+  const period = clampPeriod(requestedStart, requestedEnd, availableYears);
+  const preparedFrames = [];
+
+  for (let year = period.start; year <= period.end; year += 1) {
+    const values = {};
+
+    transfers
+      .filter((transfer) => transfer.year <= year)
+      .forEach((transfer) => {
+        values[transfer.player] = Math.max(values[transfer.player] || 0, transfer.fee);
+      });
+
+    if (Object.keys(values).length >= 2) {
+      preparedFrames.push({ year, values });
+    }
+  }
+
+  if (preparedFrames.length < 2) {
+    throw new Error("Not enough transfer records in the selected period.");
+  }
+
+  return {
+    frames: preparedFrames,
+    adjusted: period.adjusted,
+    period,
+  };
+}
+
+async function fetchDatasetSeries(dataset, requestedStart, requestedEnd) {
+  if (dataset.provider === "staticTransfers") {
+    return buildTransferFrames(dataset, requestedStart, requestedEnd);
+  }
+
+  return fetchWorldBankSeries(dataset, requestedStart, requestedEnd);
 }
 
 function getCurrentFrame() {
@@ -385,6 +541,10 @@ function applyPromptHints(prompt, start, end) {
     return { start: Math.min(start, 1990), end: Math.max(end, latestCompleteYear) };
   }
 
+  if (normalized.includes("all") || normalized.includes("aller zeiten")) {
+    return { start: 2000, end: Math.max(end, latestCompleteYear) };
+  }
+
   if (normalized.includes("kurz") || normalized.includes("aktuell")) {
     return { start: Math.max(start, latestCompleteYear - 6), end: Math.max(end, latestCompleteYear) };
   }
@@ -406,10 +566,13 @@ async function loadDatasetFromForm() {
     ? Math.max(4, Math.min(10, requestedTopCount))
     : 8;
   activeDataset = dataset;
-  sourceLabel = `World Bank Open Data: ${dataset.label}`;
+  sourceLabel =
+    dataset.provider === "worldBank"
+      ? `World Bank Open Data: ${dataset.label}`
+      : "Wikipedia: most expensive transfers";
   setStatus(`Lade ${dataset.label} ...`);
 
-  const result = await fetchWorldBankSeries(dataset, requestedPeriod.start, requestedPeriod.end);
+  const result = await fetchDatasetSeries(dataset, requestedPeriod.start, requestedPeriod.end);
   frames = result.frames;
   secondsPerFrame = frames.length > 12 ? 0.92 : 1.35;
   resetTimeline();
@@ -444,7 +607,10 @@ openDialogButton.addEventListener("click", () => {
   datasetDialog.showModal();
 });
 
-datasetSelect.addEventListener("change", syncDatasetDescription);
+datasetSelect.addEventListener("change", () => {
+  syncDatasetDescription();
+  applyDatasetDefaults();
+});
 
 cancelDialogButton.addEventListener("click", () => {
   datasetDialog.close();
@@ -457,7 +623,7 @@ datasetForm.addEventListener("submit", async (event) => {
     await loadDatasetFromForm();
   } catch (error) {
     setStatus(
-      "Die Daten konnten nicht geladen werden. Versuche z. B. GDP, Bevoelkerung, CO2 oder Internet.",
+      "Die Daten konnten nicht geladen werden. Waehle einen Datensatz aus dem Dropdown und pruefe den Zeitraum.",
       true,
     );
     console.error(error);
