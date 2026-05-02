@@ -461,10 +461,23 @@ function renderEmptyState() {
   context.fillStyle = "#f5f7fa";
   context.font = "700 34px system-ui";
   context.textAlign = "center";
-  context.fillText("Waehle ein Thema aus", canvas.width / 2, canvas.height / 2 - 12);
+  context.fillText("Noch keine Daten im Diagramm", canvas.width / 2, canvas.height / 2 - 12);
   context.fillStyle = "#a8b0bc";
   context.font = "18px system-ui";
-  context.fillText("Die App laedt danach passende Open-Data-Zeitreihen.", canvas.width / 2, canvas.height / 2 + 28);
+  context.fillText("Oeffne den Datendialog und lade einen Datensatz.", canvas.width / 2, canvas.height / 2 + 28);
+}
+
+function renderUnavailableState(message) {
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "#0e1117";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "#f5f7fa";
+  context.font = "700 30px system-ui";
+  context.textAlign = "center";
+  context.fillText("Keine darstellbaren Werte", canvas.width / 2, canvas.height / 2 - 12);
+  context.fillStyle = "#a8b0bc";
+  context.font = "18px system-ui";
+  context.fillText(message, canvas.width / 2, canvas.height / 2 + 28);
 }
 
 function render() {
@@ -475,6 +488,11 @@ function render() {
 
   const { year, rows } = getCurrentFrame();
   const topRows = rows.slice(0, topCount);
+  if (!topRows.length) {
+    renderUnavailableState("Der geladene Datensatz enthaelt fuer diesen Zeitpunkt keine Werte.");
+    return;
+  }
+
   const maxValue = Math.max(...topRows.map((row) => row.value), 1);
   const margin = { top: 54, right: 132, bottom: 48, left: 178 };
   const rowGap = 12;
@@ -576,6 +594,7 @@ async function loadDatasetFromForm() {
   frames = result.frames;
   secondsPerFrame = frames.length > 12 ? 0.92 : 1.35;
   resetTimeline();
+  render();
   playing = true;
   playToggle.textContent = "Pause";
 
@@ -598,8 +617,13 @@ function loop(now) {
   const delta = Math.min((now - lastTime) / 1000, 0.05);
   lastTime = now;
 
-  update(delta);
-  render();
+  try {
+    update(delta);
+    render();
+  } catch (error) {
+    setStatus("Beim Zeichnen der Daten ist ein Fehler aufgetreten.", true);
+    console.error(error);
+  }
   requestAnimationFrame(loop);
 }
 
